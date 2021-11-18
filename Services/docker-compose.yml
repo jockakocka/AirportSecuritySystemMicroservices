@@ -1,0 +1,145 @@
+version: '3'
+
+services:
+    cpanel:
+        image: cpanel-service
+        build:
+            context: ./
+            dockerfile: cpanel-service/Dockerfile
+        ports:
+            - "3800:3800"
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 256M
+        networks:
+            - backend_net
+            - camera_net
+        depends_on:
+            - human-detection
+    collector:
+        image: collector-microservice
+        build:
+            context: ./
+            dockerfile: collector-microservice/Dockerfile
+        ports:
+            - "31700:31700"
+        networks:
+            - backend_net
+        depends_on:
+            - human-detection
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 512M
+    human-detection:
+        image: human-detection
+        build:
+            context: ./
+            dockerfile: human-detection/Dockerfile
+        ports:
+            - "31600:31600"
+        networks:
+            - backend_net
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 512M
+    face-recognition:
+        image: ccuni/face-recognition-service-2021w
+        ports:
+            - "31300:80"
+        expose:
+            - "80"
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 256M
+        networks:
+            - backend_net
+        depends_on:
+            - human-detection
+    image-analysis:
+        image: ccuni/image-analysis-service-2021w
+        ports: 
+            - "31200:80"
+        expose:
+            - "80"
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 256M
+        networks:
+            - backend_net
+        depends_on:
+            - human-detection
+    alert:
+        image: ccuni/alert-service-2021w
+        ports:
+            - "31500:80"
+        expose: 
+            - "80"
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 256M
+        networks: 
+            - backend_net
+        depends_on:
+            - human-detection
+            - face-recognition
+    section:
+        image: ccuni/section-service-2021w
+        ports:
+            - "31400:80"
+        expose: 
+            - "80"
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 256M
+        networks:
+            - backend_net
+            - section_db_net
+        depends_on:
+            - image-analysis
+            - mongodb
+    camera:
+        image: ccuni/camera-service-2021w
+        ports: 
+            - "31100-31102:80"
+        expose: 
+            - "80"
+        deploy: 
+            mode: replicated
+            replicas: 3
+            restart_policy:
+                condition: on-failure
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 256M
+        networks:
+            - camera_net
+    mongodb:
+        image: mongo:latest
+        ports: 
+            - "27017:27017"
+        volumes:
+            - mongodb-data:/data/db
+        networks: 
+            - section_db_net
+        
+networks:
+    backend_net: {}
+    camera_net: {}
+    section_db_net: {}
+volumes:
+    mongodb-data:
